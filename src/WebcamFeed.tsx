@@ -81,73 +81,76 @@ const WebcamFeed: React.FC = () => {
     if (!ctx) return;
   
     let isDetecting = false;
-  
+
     const detect = async () => {
-      if (!video || video.paused || video.ended) {
-        return;
-      }
-  
-      if (!isDetecting) {
-        isDetecting = true;
-  
-        try {
-          const descriptorDetections = await faceapi
-            .detectAllFaces(video, new faceapi.SsdMobilenetv1Options())
-            .withFaceLandmarks()
-            .withFaceDescriptors();
-          const expressionDetections = await faceapi
-            .detectAllFaces(video, new faceapi.SsdMobilenetv1Options())
-            .withFaceLandmarks()
-            .withFaceExpressions()
-            .withAgeAndGender();
-  
+        if (!video || video.paused || video.ended) {
+          return;
+        }
+      
+        if (!isDetecting) {
+          isDetecting = true;
+      
+          try {
+            const descriptorDetections = await faceapi
+              .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+              .withFaceLandmarks()
+              .withFaceDescriptors();
+      
+            const expressionDetections = await faceapi
+              .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+              .withFaceLandmarks()
+              .withFaceExpressions()
+              .withAgeAndGender();
+      
             const resizedDescriptors = faceapi.resizeResults(descriptorDetections, displaySize);
             const resizedExpressions = faceapi.resizeResults(expressionDetections, displaySize);
-  
-
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          let label = "";
-          if (resizedExpressions.length === 0) {
-            ctx.fillStyle = 'red';
-            ctx.font = '24px Arial';
-            ctx.fillText('No faces detected', 20, 40);
-          } else {
-            resizedDescriptors.forEach((Expression) => {
-                //const { age, gender, genderProbability } = Expression;
-                //const { x, y, width, height } = Expression.detection.box;
-                const bestMatch = faceMatcher!.findBestMatch(Expression.descriptor);
-                label += `Name: ${bestMatch.toString()}`;
-              }
-            );
-            
-            resizedExpressions.forEach((Expression) => {
-              const { age, gender, genderProbability } = Expression;
-              const { x, y, width, height } = Expression.detection.box;
-              ctx.strokeStyle = '#00FF00';
-              ctx.lineWidth = 2;
-              ctx.strokeRect(x, y, width, height);
-              const roundedAge = Math.round(age);
-              label += ` | ${gender} (${(genderProbability * 100).toFixed(0)}%) Age: ${roundedAge}`;
-  
-              ctx.fillStyle = 'blue';
-              ctx.font = '16px Arial';
-             //ctx.fillText(label, x, y > 20 ? y - 10 : y + 20); // Show above or below box
-             ctx.fillText(label, x, y);
-            });
-  
-            // Draw face features
-            faceapi.draw.drawFaceExpressions(canvas, resizedExpressions);
-            faceapi.draw.drawFaceLandmarks(canvas, resizedExpressions);
+      
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+            if (resizedDescriptors.length === 0 || resizedExpressions.length === 0) {
+              ctx.fillStyle = 'red';
+              ctx.font = '24px Arial';
+              ctx.fillText('No faces detected', 20, 40);
+            } else {
+              resizedDescriptors.forEach((descriptorDetection, index) => {
+                const expressionDetection = resizedExpressions[index];
+      
+                // Make sure index is valid
+                if (!expressionDetection || !descriptorDetection) return;
+      
+                const { x, y, width, height } = expressionDetection.detection.box;
+                const { age, gender, genderProbability } = expressionDetection;
+      
+                const bestMatch = faceMatcher!.findBestMatch(descriptorDetection.descriptor);
+                const roundedAge = Math.round(age);
+      
+                const label = `${bestMatch.toString()} | ${gender} (${(genderProbability * 100).toFixed(0)}%) | Age: ${roundedAge}`;
+      
+                // Draw bounding box
+                ctx.strokeStyle = '#00FF00';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, width, height);
+      
+                // Draw label
+                ctx.fillStyle = 'blue';
+                ctx.font = '16px Arial';
+                ctx.fillText(label, x, y > 20 ? y - 10 : y + 20); // above box if enough space
+      
+                // Draw features and expressions
+                faceapi.draw.drawFaceLandmarks(canvas, [expressionDetection]);
+                faceapi.draw.drawFaceExpressions(canvas, [expressionDetection]);
+              });
+            }
+          } catch (err) {
+            console.error('Error during detection: ', err);
           }
-        } catch (err) {
-          console.error('Error during detection: ', err);
+      
+          isDetecting = false;
         }
-  
-        isDetecting = false;
-      }
-  
-      requestAnimationFrame(detect);
-    };
+      
+        requestAnimationFrame(detect);
+      };
+      
   
     detect();
   };
