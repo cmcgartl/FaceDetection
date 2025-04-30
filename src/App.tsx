@@ -1,13 +1,20 @@
 import React from 'react';
-import WebcamFeed from './WebcamFeed';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import HomePage from './pages/HomePage';
+import WebcamPage from './pages/WebcamPage';
+import UploadPage from './pages/UploadPage';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 const App: React.FC = () => {
   return (
-    <div className="container mt-5">
-      <h1 className="text-center">Webcam Face Recognition</h1>
-      <WebcamFeed />
-    </div>
+    <Router>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/webcam" element={<WebcamPage />} />
+          <Route path="/upload" element={<UploadPage />} />
+          <Route path="*" element={<Navigate to="/" />} /> {/* Redirect any unknown path to Home */}
+        </Routes>
+    </Router>
   );
 };
 
