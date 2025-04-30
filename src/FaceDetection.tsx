@@ -3,6 +3,8 @@ import * as faceapi from 'face-api.js';
 const MODEL_URL = process.env.PUBLIC_URL + '/models';
 
 export const loadModels = async () => {
+    console.log("loadModels() called");
+
   await Promise.all([
     faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
     faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
