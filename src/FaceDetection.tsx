@@ -2,6 +2,7 @@ import * as faceapi from 'face-api.js';
 
 const MODEL_URL = '/models';
 
+//load faceapi.js models
 export const loadModels = async () => {
     console.log("loadModels() called");
 
@@ -12,11 +13,12 @@ export const loadModels = async () => {
     faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
     faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL),
   ]);
-  console.log("Face-api.js models loaded successfully 🚀");
+  console.log("Face-api.js models loaded successfully");
 };
 
+//perform face detection on pre set labeled celebrity images
 export const loadLabeledImages = async () => {
-    const labels = ['Connor', 'Quentin-Tarantino', 'Samuel-L-Jackson'];
+    const labels = ['Connor', 'Quentin-Tarantino', 'Samuel-L-Jackson', 'Uma-Thurman', 'Bruce-Willis', 'John-Travolta'];
     return Promise.all(
       labels.map(async (label) => {
         const imgUrl = `/labeled_images/${label}.jpg`;

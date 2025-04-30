@@ -1,64 +1,59 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { loadModels, loadLabeledImages, faceapi } from '../FaceDetection';
-import FaceOverlay from '../components/FaceOverlay';
 import { Link } from 'react-router-dom';
 import './WebcamPage.css';
+import FaceOverlay from '../components/FaceOverlay';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { setDetections, resetDetections, setCameraOn } from '../Slices/detectionSlice';
 
+//component to open user's webcam feed and perform/display facial recognition data
 const WebcamPage: React.FC = () => {
-  // Refs to DOM elements for webcam and canvas
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const detectionActive = useRef(false);
+  const animationFrameRef = useRef<number | null>(null);
+  const [renderOverlays, setRenderOverlays] = useState(false);
   const dispatch = useDispatch();
 
-  // Select face detections and camera state from Redux store
   const detections = useSelector((state: RootState) => state.detection.detections);
   const isCameraOn = useSelector((state: RootState) => state.detection.isCameraOn);
 
-  // Local state for the face matcher and video resolution
   const [faceMatcher, setFaceMatcher] = useState<faceapi.FaceMatcher | null>(null);
-  const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
 
-  // Load face-api.js models and assign/get labels or presaved images
+  //load the faceapi.js facial recognition models and label images
   useEffect(() => {
     const load = async () => {
-      await loadModels(); // Load detection and recognition models
-      const labeledDescriptors = await loadLabeledImages(); // Load known faces
-      const matcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6); // Create face matcher with threshold
+      await loadModels();
+      const labeledDescriptors = await loadLabeledImages();
+      const matcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
       setFaceMatcher(matcher);
       console.log('Models and labeled faces loaded.');
     };
     load();
   }, []);
 
-  // Starts webcam video and starts detection when ready
+  //start webcam video
   const startCamera = async () => {
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true }); // Access webcam
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
-
-        // play the video and initialize face detection when metadata gets loaded
+        detectionActive.current = true; //sets detection to true, allows overlays to start
         videoRef.current.onloadedmetadata = async () => {
           await videoRef.current?.play();
-          dispatch(setCameraOn(true)); // Update Redux state that camera is on
+          dispatch(setCameraOn(true)); //update camera state
+          setRenderOverlays(true); //enable overlays
 
-          // Save actual video resolution for scaling overlays
-          setVideoSize({
-            width: videoRef.current!.videoWidth,
-            height: videoRef.current!.videoHeight,
-          });
-
-          // Wait for video to be fully ready before detecting faces
+          //when the webcam is ready, begin detecting faces
           const checkVideoReady = () => {
             if (videoRef.current?.readyState === 4) {
-              detectFaces(); 
+              detectFaces();
             } else {
-              requestAnimationFrame(checkVideoReady); // Try again on next frame
+              requestAnimationFrame(checkVideoReady);
             }
           };
           checkVideoReady();
@@ -69,79 +64,97 @@ const WebcamPage: React.FC = () => {
     }
   };
 
-  // Stops webcam stream and resets detections/overlays
+  //stop the webcam video feed
   const stopCamera = () => {
+    //set detection as off and disable overlays
+    setRenderOverlays(false); 
+    detectionActive.current = false;
+
+    //ensures the next animation frame doesn't cause overlays to stay after camera is stopped
+    if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+
+     // Clear canvases 
+    const canvas = canvasRef.current;
+    canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Clear Redux face data first
+    dispatch(resetDetections());
+  
+    // Stop the stream
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop()); // Stop all video tracks
+      streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
     if (videoRef.current) {
-      videoRef.current.srcObject = null; // Disconnect stream from video element
+      videoRef.current.srcObject = null;
     }
-
-    dispatch(setCameraOn(false)); // Update Redux that  camera is off
-    dispatch(resetDetections()); // Clear detections from store
-
-    // Clear the canvas overlay
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
+  
+    //update camera state to off
+    dispatch(setCameraOn(false));
   };
+  
 
-  // Detect faces while the webcam is recording
   const detectFaces = async () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
+
     if (!video || !canvas) return;
 
     const detect = async () => {
+        //ensure video is valid and playing
       if (!video || video.paused || video.ended) return;
 
-      
       try {
-        // use faceapi to detect/analyze faces in the webcam video
-        const detections = await faceapi
+        //perform faceapi face detection on the video feed
+        const rawDetections = await faceapi
           .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
           .withFaceLandmarks()
           .withFaceExpressions()
           .withAgeAndGender()
           .withFaceDescriptors();
 
-        // Resize results to match webcam video resolution
-        const resizedDetections = faceapi.resizeResults(detections, {
-          width: video.videoWidth,
-          height: video.videoHeight,
+        //match canvays size to the video dimensions
+        const displayWidth = video.offsetWidth;
+        const displayHeight = video.offsetHeight;
+        canvas.width = displayWidth;
+        canvas.height = displayHeight;
+
+        //resize face detections to the video display size
+        const resizedDetections = faceapi.resizeResults(rawDetections, {
+          width: displayWidth,
+          height: displayHeight,
         });
 
-        dispatch(setDetections(resizedDetections)); 
-
-        // Resize canvas to webcam video resolutioj and draw overlays
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
+        //draw face landmards and emotion prediction on the canvas
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear previous frame
-          faceapi.draw.drawFaceLandmarks(canvas, resizedDetections); // Draw face landmarks (eyes, nose, mouth, etc)
-          faceapi.draw.drawFaceExpressions(canvas, resizedDetections); // displays emotion predictions
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
+          faceapi.draw.drawFaceExpressions(canvas, resizedDetections);
         }
+
+        //if detection is active, push the detections to redux store
+        if (!detectionActive.current) return;
+        dispatch(setDetections(resizedDetections));
       } catch (err) {
-        console.error('Error during detection: ', err);
+        console.error('Error during detection:', err);
       }
 
-      //continues the detection loop on the next frame
-      requestAnimationFrame(detect);
+      //if detection is active, continue
+      if (detectionActive.current) {
+        animationFrameRef.current = requestAnimationFrame(detect);
+      }
     };
-
 
     detect();
   };
 
   return (
     <>
-      {/* Header with title and navigation */}
+    {/*header containing title and back to home button*/}
       <header className="webcam-banner">
         <Link to="/" className="btn btn-light back-link">← Back To Home</Link>
         <div className="banner-title">
@@ -150,54 +163,53 @@ const WebcamPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Main page layout */}
       <div className="webcam-page">
         <h1>Live Webcam Facial Recognition!</h1>
 
-        {/* Toggle webcam controls */}
+        {/*Camera start and stop button*/}
         <div className="camera-controls">
-           {isCameraOn ? (
+          {isCameraOn ? (
             <button className="btn btn-danger" onClick={stopCamera}>Stop Camera</button>
           ) : (
             <button className="btn btn-success" onClick={startCamera}>Start Camera</button>
           )}
         </div>
 
-        {/* Video container with detection overlay */}
+        {/*PlaceHolder for when video is off*/}
         <div className="video-box">
           <p>Start your camera to try out facial recognition!</p>
           <video ref={videoRef} autoPlay playsInline muted className="video-element" />
           <canvas ref={canvasRef} className="overlay-canvas" />
 
-          {/* Render FaceOverlay for each detected face */}
-          {detections.map((detection: any, index: number) => {
+          {/* FaceOverlay labels for each detected face */}
+          {isCameraOn && detections.map((detection: any, index: number) => {
             const { x, y, width, height } = detection.detection.box;
             const videoEl = videoRef.current;
-            if (!videoEl || !videoSize.width) return null;
+            if (!videoEl || !canvasRef.current) return null;
 
-            // Calculate scaling from native resolution to displayed video size
-            const scaleX = videoEl.offsetWidth / videoSize.width;
-            const scaleY = videoEl.offsetHeight / videoSize.height;
+            {/*determine scaling needed to match overlay to video display size*/}
+            const scaleX = videoEl.offsetWidth / canvasRef.current.width;
+            const scaleY = videoEl.offsetHeight / canvasRef.current.height;
 
-            // get the information from facial recognition
+            //set face detection data
             const bestMatch = faceMatcher?.findBestMatch(detection.descriptor);
-            const roundedAge = Math.round(detection.age);
+            const age = Math.round(detection.age);
             const gender = detection.gender;
-            const genderProbability = detection.genderProbability;
+            const confidence = (detection.genderProbability * 100).toFixed(0);
 
-            // set label text with data from facial recognition
+            //set label to match face detection data
             const label = bestMatch
-              ? `${bestMatch.toString()} | ${gender} (${(genderProbability * 100).toFixed(0)}%) | Age: ${roundedAge}`
-              : "Unknown";
+              ? `${bestMatch.toString()} | ${gender} (${confidence}%) | Age: ${age}`
+              : `Unknown | ${gender} (${confidence}%) | Age: ${age}`;
 
-            // Render overlay for the face
+              //display the face bounding box and age/gender/name data
             return (
               <FaceOverlay
                 key={index}
                 box={{ x, y, width, height }}
                 label={label}
 
-                //apply a shrink factor because face boxes were appearing too large
+                //shrink factor ensures the bounding box is properly sized
                 shrinkFactor={0.87}
                 scale={{ x: scaleX, y: scaleY }}
               />

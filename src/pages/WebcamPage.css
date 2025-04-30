@@ -7,13 +7,13 @@ html, body {
     font-family: 'Segoe UI', sans-serif;
   }
   
-  /* Page content container */
+  /* Main container */
   .webcam-page {
     text-align: center;
     padding: 20px;
   }
   
-  /* Top banner layout */
+  /* Banner */
   .webcam-banner {
     display: flex;
     align-items: center;
@@ -26,7 +26,7 @@ html, body {
     box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
   }
   
-  /* Back button inside banner */
+  /* Back to home button */
   .webcam-banner .back-link {
     position: absolute;
     left: 1.5rem;
@@ -41,7 +41,6 @@ html, body {
     font-weight: bold;
   }
   
-  /* Centered banner text */
   .banner-title {
     text-align: center;
   }
@@ -57,43 +56,119 @@ html, body {
     margin-top: 0;
   }
   
-  /* Start/Stop camera button area */
+  /* Camera control buttons */
   .camera-controls {
     margin: 1rem 0;
   }
   
-  /* Container for webcam video and overlays */
+  /* video box styling */
   .video-box {
     position: relative;
     width: 100%;
     max-width: 600px;
     aspect-ratio: 4 / 3;
+    margin: 0 auto;
     background-color: #c8e6c9;
     border-radius: 12px;
-    margin: 0 auto;
     overflow: hidden;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
   
-  /* Placeholder text inside video box */
-  .video-box p {
-    position: relative;
-    font-size: 2rem;
-    margin-bottom: 0.5rem;
-    margin-top: 11rem;
-  }
-  
-  /* Positioning for video and overlay canvas */
+  /* Video and Canvas overlays */
   .video-element,
   .overlay-canvas {
     position: absolute;
     top: 0;
     left: 0;
+    display: block;
     width: 100%;
     height: 100%;
-    border-radius: 12px;
     object-fit: cover;
-    display: block;
+    border-radius: 12px;
+    pointer-events: none;
+    z-index: 1;
+  }
+  
+  /* FaceOverlay components */
+  .video-box > div {
+    position: absolute;
+    z-index: 2;
+  }
+  
+  /* Centered placeholder text */
+  .video-box p {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #444;
+    text-align: center;
+    margin: 0;
+    z-index: 0;
     pointer-events: none;
   }
   
+  /* mobile adjustments*/
+  @media (max-width: 600px) {
+    .webcam-banner {
+      flex-direction: column;
+      align-items: center;
+      padding: 1rem;
+    }
+  
+    .webcam-banner .back-link {
+      position: static;
+      margin-bottom: 0.5rem;
+      transform: none;
+    }
+  
+    .banner-title h1 {
+      font-size: 2rem;
+      text-align: center;
+    }
+  
+    .banner-title h5 {
+      font-size: 1rem;
+      text-align: center;
+    }
+  
+    .video-box p {
+      font-size: 1.2rem;
+      padding: 0 1rem;
+    }
+  }
+  
+  /* Use taller layout in portrait mode */
+  @media (orientation: portrait) and (max-width: 600px) {
+    .video-box {
+      aspect-ratio: unset;
+      height: 60vh;
+      width: 100vw;
+    }
+  }
+  
+  @media (orientation: landscape) and (max-width: 900px) {
+    .webcam-banner {
+      flex-direction: column;
+      align-items: center;
+      padding: 1rem;
+    }
+  
+    .webcam-banner .back-link {
+      position: static;
+      margin-bottom: 0.5rem;
+      transform: none;
+    }
+  
+    .banner-title h1 {
+      font-size: 2rem;
+      text-align: center;
+    }
+  
+    .banner-title h5 {
+      font-size: 1rem;
+      text-align: center;
+    }
+  }

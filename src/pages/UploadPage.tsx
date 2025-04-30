@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { loadModels, loadLabeledImages, faceapi } from '../FaceDetection';
 import FaceOverlay from '../components/FaceOverlay';
 import { Link } from 'react-router-dom';
@@ -70,7 +70,7 @@ const UploadImage: React.FC = () => {
     };
   };
 
-  useEffect(() => {
+  const redrawOverlay = useCallback(() => {
     //if the uploaded image and canvas are ready/valid
     if (
       uploadedImage &&
@@ -101,6 +101,29 @@ const UploadImage: React.FC = () => {
     }
   }, [uploadedImage, detections, displaySize]);
 
+  //redraw overlay when phone is rotated
+  useEffect(() => {
+    redrawOverlay();
+  }, [uploadedImage, detections, displaySize, redrawOverlay]);
+
+  //Handle screen rotation
+  useEffect(() => {
+    //redraw overlas when screen is rotated to ensure proper sizing/placement
+    const handleResize = () => {
+      if (imageRef.current) {
+        const { width, height } = imageRef.current.getBoundingClientRect();
+        setDisplaySize({ width, height });
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
 
   return (
     <>
@@ -181,6 +204,8 @@ const UploadImage: React.FC = () => {
                   key={index}
                   box={{ x, y, width, height }}
                   label={label}
+
+                  //slight shrink factor
                   shrinkFactor={0.95}
                   scale={{ x: scaleX, y: scaleY }}
                 />

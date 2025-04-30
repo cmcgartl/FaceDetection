@@ -31,7 +31,7 @@ const HomePage: React.FC = () => {
             {/* Upload Card */}
             <div className="custom-card upload-card">
               <h2>Upload An Image!</h2>
-              <p>Try it on your favorite celebrity! Upload a photo to detect faces and display face recognition data with overlays.</p>
+              <p>Try it on your favorite celebrity! Upload a photo to detect faces and display face recognition data.</p>
               <img
                 src="/home_images/Upload.jpg" 
                 alt="Example of webcam face recognition"
